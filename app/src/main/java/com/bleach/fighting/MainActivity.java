@@ -23,7 +23,7 @@ public class MainActivity extends Activity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
 
-        setContentView(new BattleView());
+        setContentView(new BattleView(this));
     }
 
     public static class BattleView extends View {
