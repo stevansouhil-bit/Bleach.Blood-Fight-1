@@ -1,3 +1,4 @@
+
 name: Build Bleach Fighting APK
 
 on:
@@ -23,16 +24,22 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses
+
       - name: Install Android SDK
         run: |
           sdkmanager "platforms;android-36" "build-tools;35.0.0"
-          yes | sdkmanager --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
