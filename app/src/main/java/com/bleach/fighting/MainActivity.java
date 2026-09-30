@@ -53,4 +53,3 @@ public class MainActivity extends Activity {
             canvas.drawCircle(w * 0.18f, h * 0.35f, h * 0.45f, paint);
 
             paint.setColor(Color.rgb(20, 20, 30));
-            canvas.draw
