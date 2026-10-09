@@ -16,6 +16,11 @@ var player_swing_time := 0.0
 var enemy_swing_time := 0.0
 var hit_flash_time := 0.0
 var round_over := false
+var blocking := false
+var dash_time := 0.0
+var dash_cd := 0.0
+var bankai_cd := 0.0
+var dash_direction := 1.0
 
 var status_label: Label
 var message_label: Label
@@ -214,6 +219,9 @@ func make_ui() -> void:
     add_move_button(controls, "▶", 1.0)
     add_button(controls, "SWORD", sword_attack)
     add_button(controls, "ENERGY", energy_attack)
+    add_block_button(controls)
+    add_button(controls, "DASH", dash_attack)
+    add_button(controls, "BANKAI", bankai_attack)
     add_button(controls, "RESET", reset_round)
 
 func add_button(parent: Control, caption: String, action: Callable) -> void:
@@ -239,6 +247,9 @@ func add_move_button(parent: Control, caption: String, direction: float) -> void
     parent.add_child(button)
 
 func _process(delta: float) -> void:
+    dash_cd = maxf(0.0, dash_cd - delta)
+    bankai_cd = maxf(0.0, bankai_cd - delta)
+    dash_time = maxf(0.0, dash_time - delta)
     if round_over:
         return
 
@@ -251,6 +262,8 @@ func _process(delta: float) -> void:
     hit_flash_time = maxf(0.0, hit_flash_time - delta)
 
     player.position.x = clampf(player.position.x + move_dir * delta * 3.2, -ARENA_LIMIT, ARENA_LIMIT)
+    if dash_time > 0.0:
+        player.position.x = clampf(player.position.x + dash_direction * delta * 8.0, -ARENA_LIMIT, ARENA_LIMIT)
 
     var distance := absf(player.position.x - enemy.position.x)
     var direction := signf(player.position.x - enemy.position.x)
@@ -322,7 +335,8 @@ func enemy_attack() -> void:
     enemy_attack_cd = randf_range(1.0, 1.5)
     enemy_swing_time = 0.22
     if absf(player.position.x - enemy.position.x) <= 1.85:
-        player_hp = maxi(0, player_hp - 9)
+        var damage := 3 if blocking else 9
+        player_hp = maxi(0, player_hp - damage)
         hit_flash_time = 0.12
         hit_effect(player.position + Vector3(0, 0.2, 0), Color(1.0, 0.08, 0.22))
         message_label.text = "RIVAL STRIKE! -9 HP"
@@ -362,6 +376,10 @@ func reset_round() -> void:
     enemy_sword.rotation = Vector3.ZERO
 
     player_hp = 100
+    blocking = false
+    dash_time = 0.0
+    dash_cd = 0.0
+    bankai_cd = 0.0
     enemy_hp = 100
     move_dir = 0.0
     player_attack_cd = 0.0
@@ -381,3 +399,43 @@ func update_status() -> void:
     status_label.text = "PLAYER %d HP | RIVAL %d HP" % [player_hp, enemy_hp]
     player_bar.value = player_hp
     enemy_bar.value = enemy_hp
+
+func start_block() -> void:
+    if not round_over:
+        blocking = true
+        message_label.text = "DEFENSE ACTIVE!"
+
+func dash_attack() -> void:
+    if round_over or dash_cd > 0.0:
+        return
+    dash_cd = 1.0
+    dash_time = 0.18
+    dash_direction = -1.0 if player.position.x > enemy.position.x else 1.0
+    player.position.x = clampf(player.position.x + dash_direction * 0.8, -ARENA_LIMIT, ARENA_LIMIT)
+    hit_effect(player.position + Vector3(0, 0.25, 0), Color(0.15, 0.75, 1.0))
+    message_label.text = "FLASH STEP!"
+
+func bankai_attack() -> void:
+    if round_over or bankai_cd > 0.0:
+        return
+    bankai_cd = 5.0
+    player_swing_time = 0.35
+    hit_effect(player.position + Vector3(0, 0.5, 0), Color(0.1, 0.8, 1.0))
+    if absf(player.position.x - enemy.position.x) <= 5.0:
+        enemy_hp = maxi(0, enemy_hp - 35)
+        hit_effect(enemy.position + Vector3(0, 0.4, 0), Color(0.55, 0.1, 1.0))
+        message_label.text = "BANKAI! -35 HP"
+        if enemy_hp <= 0:
+            finish_round(true)
+    else:
+        message_label.text = "BANKAI: RIVAL TOO FAR"
+    update_status()
+
+func add_block_button(parent: Control) -> void:
+    var button := Button.new()
+    button.text = "BLOCK"
+    button.custom_minimum_size = Vector2(70, 58)
+    button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    button.button_down.connect(start_block)
+    button.button_up.connect(func(): blocking = false)
+    parent.add_child(button)
