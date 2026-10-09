@@ -16,21 +16,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Godot version
-        run: godot --version
+      - name: Configure Godot Android environment
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.7.2.stable"
+          cp -a /root/.local/share/godot/export_templates/4.7.2.stable/. "$HOME/.local/share/godot/export_templates/4.7.2.stable/"
+          mkdir -p "$HOME/.config/godot"
+          cp /root/.config/godot/editor_settings-4.7.tres "$HOME/.config/godot/"
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=/usr/lib/android-sdk" >> "$GITHUB_ENV"
+          java -version
+          test -f "$HOME/.local/share/godot/export_templates/4.7.2.stable/android_debug.apk"
+          test -f "$HOME/.config/godot/editor_settings-4.7.tres"
+
+      - name: Install Android build tools
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Validate game project
         working-directory: godot_game
-        run: |
-          godot --headless --editor --path . --quit
+        run: godot --headless --editor --path . --quit
 
       - name: Export Android APK
         working-directory: godot_game
         run: |
           mkdir -p build
-          godot --headless --path . \
-            --export-debug "Android" \
-            build/BleachBloodFight.apk
+          godot --headless --path . --export-debug "Android" build/BleachBloodFight.apk
           test -s build/BleachBloodFight.apk
 
       - name: Upload APK
