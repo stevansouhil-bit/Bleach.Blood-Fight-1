@@ -12,6 +12,9 @@ var player_attack_cd := 0.0
 var energy_cd := 0.0
 var enemy_attack_cd := 0.8
 var enemy_think_cd := 0.0
+var player_swing_time := 0.0
+var enemy_swing_time := 0.0
+var hit_flash_time := 0.0
 var round_over := false
 
 var status_label: Label
@@ -21,8 +24,10 @@ var enemy_bar: ProgressBar
 
 const PLAYER_START := Vector3(-2.0, 0.95, 0.0)
 const ENEMY_START := Vector3(2.0, 0.95, 0.0)
+const ARENA_LIMIT := 5.5
 
 func _ready() -> void:
+    randomize()
     make_arena()
     player = make_fighter(PLAYER_START, Color(0.045, 0.09, 0.19), Color(0.05, 0.8, 1.0))
     enemy = make_fighter(ENEMY_START, Color(0.19, 0.025, 0.055), Color(1.0, 0.055, 0.19))
@@ -80,46 +85,46 @@ func make_fighter(pos: Vector3, tint: Color, aura_color: Color) -> Node3D:
     var aura := material(aura_color, 0.15, true)
     var steel := material(Color(0.7, 0.86, 1.0), 0.85, true)
 
-    var torso_mesh := CapsuleMesh.new()
-    torso_mesh.radius = 0.34
-    torso_mesh.height = 1.1
-    part(fighter, torso_mesh, Vector3(0, 0.0, 0), armor, "Torso")
+    var torso := CapsuleMesh.new()
+    torso.radius = 0.34
+    torso.height = 1.1
+    part(fighter, torso, Vector3(0, 0, 0), armor, "Torso")
 
-    var coat_mesh := BoxMesh.new()
-    coat_mesh.size = Vector3(0.72, 0.72, 0.22)
-    part(fighter, coat_mesh, Vector3(0, -0.14, 0.13), cloth, "Coat")
+    var coat := BoxMesh.new()
+    coat.size = Vector3(0.72, 0.72, 0.22)
+    part(fighter, coat, Vector3(0, -0.14, 0.13), cloth, "Coat")
 
-    var head_mesh := SphereMesh.new()
-    head_mesh.radius = 0.27
-    head_mesh.height = 0.54
-    part(fighter, head_mesh, Vector3(0, 0.77, 0), skin, "Head")
+    var head := SphereMesh.new()
+    head.radius = 0.27
+    head.height = 0.54
+    part(fighter, head, Vector3(0, 0.77, 0), skin, "Head")
 
     var hair_mesh := SphereMesh.new()
     hair_mesh.radius = 0.29
     hair_mesh.height = 0.34
     part(fighter, hair_mesh, Vector3(0, 0.96, -0.015), hair, "Hair")
 
-    var eye_mesh := BoxMesh.new()
-    eye_mesh.size = Vector3(0.22, 0.045, 0.035)
-    part(fighter, eye_mesh, Vector3(0, 0.79, 0.245), aura, "Eyes")
+    var eyes := BoxMesh.new()
+    eyes.size = Vector3(0.22, 0.045, 0.035)
+    part(fighter, eyes, Vector3(0, 0.79, 0.245), aura, "Eyes")
 
-    var arm_mesh := CapsuleMesh.new()
-    arm_mesh.radius = 0.105
-    arm_mesh.height = 0.64
-    var arm_left := part(fighter, arm_mesh, Vector3(-0.42, 0.0, 0), armor, "ArmLeft")
-    arm_left.rotation.z = -0.2
-    var arm_right := part(fighter, arm_mesh, Vector3(0.42, 0.0, 0), armor, "ArmRight")
-    arm_right.rotation.z = 0.2
+    var arm := CapsuleMesh.new()
+    arm.radius = 0.105
+    arm.height = 0.64
+    var left_arm := part(fighter, arm, Vector3(-0.42, 0, 0), armor, "ArmLeft")
+    left_arm.rotation.z = -0.2
+    var right_arm := part(fighter, arm, Vector3(0.42, 0, 0), armor, "ArmRight")
+    right_arm.rotation.z = 0.2
 
-    var leg_mesh := CapsuleMesh.new()
-    leg_mesh.radius = 0.13
-    leg_mesh.height = 0.68
-    part(fighter, leg_mesh, Vector3(-0.18, -0.56, 0), cloth, "LegLeft")
-    part(fighter, leg_mesh, Vector3(0.18, -0.56, 0), cloth, "LegRight")
+    var leg := CapsuleMesh.new()
+    leg.radius = 0.13
+    leg.height = 0.68
+    part(fighter, leg, Vector3(-0.18, -0.56, 0), cloth, "LegLeft")
+    part(fighter, leg, Vector3(0.18, -0.56, 0), cloth, "LegRight")
 
-    var belt_mesh := BoxMesh.new()
-    belt_mesh.size = Vector3(0.66, 0.09, 0.24)
-    part(fighter, belt_mesh, Vector3(0, -0.34, 0.03), aura, "Belt")
+    var belt := BoxMesh.new()
+    belt.size = Vector3(0.66, 0.09, 0.24)
+    part(fighter, belt, Vector3(0, -0.34, 0.03), aura, "Belt")
 
     var pivot := Node3D.new()
     pivot.name = "SwordPivot"
@@ -143,7 +148,6 @@ func make_fighter(pos: Vector3, tint: Color, aura_color: Color) -> Node3D:
     aura_mesh.height = 1.55
     var aura_part := part(fighter, aura_mesh, Vector3(0, 0, -0.12), aura, "Aura")
     aura_part.scale = Vector3(0.82, 0.9, 0.42)
-
     return fighter
 
 func make_camera() -> void:
@@ -191,7 +195,7 @@ func make_ui() -> void:
     panel.add_child(enemy_bar)
 
     message_label = Label.new()
-    message_label.text = "SOUL ARENA  |  DEFEAT THE RIVAL"
+    message_label.text = "SOUL ARENA | DEFEAT THE RIVAL"
     message_label.add_theme_font_size_override("font_size", 14)
     message_label.add_theme_color_override("font_color", Color(0.9, 0.7, 1.0))
     panel.add_child(message_label)
@@ -205,9 +209,9 @@ func make_ui() -> void:
     controls.add_theme_constant_override("separation", 5)
     layer.add_child(controls)
 
-    add_button(controls, "◀", func(): move_dir = -1.0)
+    add_move_button(controls, "◀", -1.0)
     add_button(controls, "STOP", func(): move_dir = 0.0)
-    add_button(controls, "▶", func(): move_dir = 1.0)
+    add_move_button(controls, "▶", 1.0)
     add_button(controls, "SWORD", sword_attack)
     add_button(controls, "ENERGY", energy_attack)
     add_button(controls, "RESET", reset_round)
@@ -221,6 +225,19 @@ func add_button(parent: Control, caption: String, action: Callable) -> void:
     button.pressed.connect(action)
     parent.add_child(button)
 
+func add_move_button(parent: Control, caption: String, direction: float) -> void:
+    var button := Button.new()
+    button.text = caption
+    button.custom_minimum_size = Vector2(70, 58)
+    button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    button.add_theme_font_size_override("font_size", 18)
+    button.button_down.connect(func(): move_dir = direction)
+    button.button_up.connect(func():
+        if move_dir == direction:
+            move_dir = 0.0
+    )
+    parent.add_child(button)
+
 func _process(delta: float) -> void:
     if round_over:
         return
@@ -229,53 +246,43 @@ func _process(delta: float) -> void:
     energy_cd = maxf(0.0, energy_cd - delta)
     enemy_attack_cd = maxf(0.0, enemy_attack_cd - delta)
     enemy_think_cd = maxf(0.0, enemy_think_cd - delta)
+    player_swing_time = maxf(0.0, player_swing_time - delta)
+    enemy_swing_time = maxf(0.0, enemy_swing_time - delta)
+    hit_flash_time = maxf(0.0, hit_flash_time - delta)
 
-    player.position.x = clampf(player.position.x + move_dir * delta * 3.2, -5.5, 5.5)
+    player.position.x = clampf(player.position.x + move_dir * delta * 3.2, -ARENA_LIMIT, ARENA_LIMIT)
 
-    if player_attack_cd > 0.0 and player_attack_cd < 0.18:
-        player_sword.rotation.z = -0.85
-    else:
-        player_sword.rotation.z = 0.0
-
-    if enemy_attack_cd > 0.55 and enemy_attack_cd < 0.8:
-        enemy_sword.rotation.z = -0.8
-    else:
-        enemy_sword.rotation.z = 0.0
-
-    # Computer-controlled rival: approach, keep distance, and attack.
     var distance := absf(player.position.x - enemy.position.x)
     var direction := signf(player.position.x - enemy.position.x)
 
-    if distance > 1.55:
-        enemy.position.x += direction * delta * 1.45
-    elif distance < 1.05:
-        enemy.position.x -= direction * delta * 0.65
+    if enemy_think_cd <= 0.0:
+        enemy_think_cd = randf_range(0.18, 0.38)
+        if distance > 1.65:
+            enemy.position.x += direction * randf_range(0.18, 0.42)
+        elif distance < 1.05:
+            enemy.position.x -= direction * randf_range(0.08, 0.22)
+        enemy.position.x = clampf(enemy.position.x, -ARENA_LIMIT, ARENA_LIMIT)
 
-    enemy.position.x = clampf(enemy.position.x, -5.5, 5.5)
+    player_sword.rotation.z = -0.95 if player_swing_time > 0.0 else 0.0
+    enemy_sword.rotation.z = -0.95 if enemy_swing_time > 0.0 else 0.0
 
-    if direction != 0.0:
-        enemy.rotation.y = 0.0 if direction > 0.0 else PI
-        player.rotation.y = 0.0 if player.position.x < enemy.position.x else PI
-
-    if distance <= 1.7 and enemy_attack_cd <= 0.0:
+    if distance <= 1.75 and enemy_attack_cd <= 0.0:
         enemy_attack()
 
-    if enemy_think_cd <= 0.0:
-        enemy_think_cd = 0.25
-        update_status()
+    player.scale = Vector3(1.04, 1.04, 1.04) if hit_flash_time > 0.0 else Vector3.ONE
+    update_status()
 
 func sword_attack() -> void:
     if round_over or player_attack_cd > 0.0:
         return
+    player_attack_cd = 0.48
+    player_swing_time = 0.20
 
-    player_attack_cd = 0.38
-    player_sword.rotation.z = -0.85
-
-    if absf(player.position.x - enemy.position.x) <= 2.6:
+    if absf(player.position.x - enemy.position.x) <= 2.25:
         enemy_hp = maxi(0, enemy_hp - 12)
         hit_effect(enemy.position + Vector3(0, 0.2, 0), Color(0.2, 0.8, 1.0))
-        message_label.text = "SWORD STRIKE!  -12"
-        enemy.position.x = clampf(enemy.position.x + signf(enemy.position.x - player.position.x) * 0.25, -5.5, 5.5)
+        message_label.text = "SWORD STRIKE! -12"
+        enemy.position.x = clampf(enemy.position.x + signf(enemy.position.x - player.position.x) * 0.22, -ARENA_LIMIT, ARENA_LIMIT)
         if enemy_hp <= 0:
             finish_round(true)
     else:
@@ -285,13 +292,26 @@ func sword_attack() -> void:
 func energy_attack() -> void:
     if round_over or energy_cd > 0.0:
         return
+    energy_cd = 1.25
+    message_label.text = "SPIRIT BLAST!"
 
-    energy_cd = 1.0
-    hit_effect((player.position + enemy.position) / 2.0 + Vector3(0, 0.3, 0), Color(0.05, 0.55, 1.0))
+    var orb := MeshInstance3D.new()
+    var orb_mesh := SphereMesh.new()
+    orb_mesh.radius = 0.19
+    orb_mesh.height = 0.38
+    orb.mesh = orb_mesh
+    orb.material_override = material(Color(0.05, 0.65, 1.0), 0.1, true)
+    orb.position = player.position + Vector3(0.5, 0.35, 0.1)
+    add_child(orb)
 
-    if absf(player.position.x - enemy.position.x) <= 4.5:
+    var tween := create_tween()
+    tween.tween_property(orb, "position", enemy.position + Vector3(0, 0.25, 0), 0.24)
+    tween.tween_callback(orb.queue_free)
+
+    if absf(player.position.x - enemy.position.x) <= 4.8:
         enemy_hp = maxi(0, enemy_hp - 20)
-        message_label.text = "SPIRIT BLAST!  -20"
+        hit_effect(enemy.position + Vector3(0, 0.25, 0), Color(0.05, 0.55, 1.0))
+        message_label.text = "SPIRIT BLAST! -20"
         if enemy_hp <= 0:
             finish_round(true)
     else:
@@ -299,12 +319,13 @@ func energy_attack() -> void:
     update_status()
 
 func enemy_attack() -> void:
-    enemy_attack_cd = 1.15
-    enemy_sword.rotation.z = -0.8
+    enemy_attack_cd = randf_range(1.0, 1.5)
+    enemy_swing_time = 0.22
     if absf(player.position.x - enemy.position.x) <= 1.85:
         player_hp = maxi(0, player_hp - 9)
+        hit_flash_time = 0.12
         hit_effect(player.position + Vector3(0, 0.2, 0), Color(1.0, 0.08, 0.22))
-        message_label.text = "RIVAL STRIKE!  -9 HP"
+        message_label.text = "RIVAL STRIKE! -9 HP"
         if player_hp <= 0:
             finish_round(false)
     update_status()
@@ -319,11 +340,9 @@ func hit_effect(pos: Vector3, tint: Color) -> void:
     effect.material_override = material(tint, 0.2, true)
     add_child(effect)
 
-    var timer := get_tree().create_timer(0.22)
-    timer.timeout.connect(func():
-        if is_instance_valid(effect):
-            effect.queue_free()
-    )
+    var tween := create_tween()
+    tween.tween_property(effect, "scale", Vector3(1.7, 1.7, 1.7), 0.18)
+    tween.tween_callback(effect.queue_free)
 
 func finish_round(won: bool) -> void:
     round_over = true
@@ -333,12 +352,15 @@ func finish_round(won: bool) -> void:
 func reset_round() -> void:
     player.position = PLAYER_START
     enemy.position = ENEMY_START
-    player.rotation.y = 0.0
-    enemy.rotation.y = PI
+    player.rotation = Vector3.ZERO
+    enemy.rotation = Vector3.ZERO
     player.scale = Vector3.ONE
     enemy.scale = Vector3.ONE
-    player_sword.rotation.z = 0.0
-    enemy_sword.rotation.z = 0.0
+    player_sword.scale = Vector3.ONE
+    enemy_sword.scale = Vector3.ONE
+    player_sword.rotation = Vector3.ZERO
+    enemy_sword.rotation = Vector3.ZERO
+
     player_hp = 100
     enemy_hp = 100
     move_dir = 0.0
@@ -346,13 +368,16 @@ func reset_round() -> void:
     energy_cd = 0.0
     enemy_attack_cd = 0.8
     enemy_think_cd = 0.0
+    player_swing_time = 0.0
+    enemy_swing_time = 0.0
+    hit_flash_time = 0.0
     round_over = false
-    message_label.text = "SOUL ARENA  |  DEFEAT THE RIVAL"
+    message_label.text = "SOUL ARENA | DEFEAT THE RIVAL"
     update_status()
 
 func update_status() -> void:
     if not is_instance_valid(status_label):
         return
-    status_label.text = "PLAYER %d HP  |  RIVAL %d HP" % [player_hp, enemy_hp]
+    status_label.text = "PLAYER %d HP | RIVAL %d HP" % [player_hp, enemy_hp]
     player_bar.value = player_hp
     enemy_bar.value = enemy_hp
