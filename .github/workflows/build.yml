@@ -1,5 +1,4 @@
-
-name: Build Bleach Fighting APK
+name: Build Bleach Blood Fight 3D APK
 
 on:
   workflow_dispatch:
@@ -10,37 +9,33 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.2
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+      - name: Check Godot version
+        run: godot --version
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-        with:
-          accept-android-sdk-licenses: 'true'
-          log-accepted-android-sdk-licenses: 'false'
-      - name: Install Android SDK
+      - name: Validate game project
+        working-directory: godot_game
         run: |
-          sdkmanager "platforms;android-36" "build-tools;35.0.0"
+          godot --headless --editor --path . --quit
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
-      - name: Build APK
+      - name: Export Android APK
+        working-directory: godot_game
         run: |
-          gradle assembleDebug
+          mkdir -p build
+          godot --headless --path . \
+            --export-debug "Android" \
+            build/BleachBloodFight.apk
+          test -s build/BleachBloodFight.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: BleachFighting-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: BleachBloodFight-Android
+          path: godot_game/build/BleachBloodFight.apk
+          if-no-files-found: error
