@@ -16,6 +16,10 @@ var player_swing_time := 0.0
 var enemy_swing_time := 0.0
 var hit_flash_time := 0.0
 var round_over := false
+var wins := 0
+var losses := 0
+var character_index := 0
+var character_names := ["ICHIGO", "BYAKUYA", "KENPACHI"]
 var blocking := false
 var dash_time := 0.0
 var dash_cd := 0.0
@@ -223,6 +227,7 @@ func make_ui() -> void:
     add_button(controls, "DASH", dash_attack)
     add_button(controls, "BANKAI", bankai_attack)
     add_button(controls, "RESET", reset_round)
+    add_button(controls, "CHAR", cycle_character)
 
 func add_button(parent: Control, caption: String, action: Callable) -> void:
     var button := Button.new()
@@ -359,9 +364,17 @@ func hit_effect(pos: Vector3, tint: Color) -> void:
     tween.tween_callback(effect.queue_free)
 
 func finish_round(won: bool) -> void:
+    if round_over:
+        return
     round_over = true
     move_dir = 0.0
-    message_label.text = "VICTORY! ROUND WON!" if won else "DEFEATED! TRY AGAIN"
+    blocking = false
+    if won:
+        wins += 1
+        message_label.text = "VICTORY! WINS: %d" % wins
+    else:
+        losses += 1
+        message_label.text = "DEFEATED! LOSSES: %d" % losses
 
 func reset_round() -> void:
     player.position = PLAYER_START
@@ -396,7 +409,7 @@ func reset_round() -> void:
 func update_status() -> void:
     if not is_instance_valid(status_label):
         return
-    status_label.text = "PLAYER %d HP | RIVAL %d HP" % [player_hp, enemy_hp]
+    status_label.text = "%s | YOU %d HP | RIVAL %d HP | W:%d L:%d" % [character_names[character_index], player_hp, enemy_hp, wins, losses]
     player_bar.value = player_hp
     enemy_bar.value = enemy_hp
 
@@ -429,6 +442,37 @@ func bankai_attack() -> void:
             finish_round(true)
     else:
         message_label.text = "BANKAI: RIVAL TOO FAR"
+    update_status()
+
+func cycle_character() -> void:
+    if round_over:
+        return
+    character_index = (character_index + 1) % character_names.size()
+    var armor_color: Color
+    var hair_color: Color
+    var aura_color: Color
+    match character_index:
+        0:
+            armor_color = Color(0.045, 0.09, 0.19)
+            hair_color = Color(0.95, 0.25, 0.08)
+            aura_color = Color(0.05, 0.8, 1.0)
+        1:
+            armor_color = Color(0.85, 0.85, 0.92)
+            hair_color = Color(0.06, 0.05, 0.12)
+            aura_color = Color(0.75, 0.25, 1.0)
+        _:
+            armor_color = Color(0.12, 0.04, 0.055)
+            hair_color = Color(0.03, 0.025, 0.035)
+            aura_color = Color(1.0, 0.06, 0.12)
+    player.get_node("Torso").material_override = material(armor_color, 0.3)
+    player.get_node("ArmLeft").material_override = material(armor_color, 0.3)
+    player.get_node("ArmRight").material_override = material(armor_color, 0.3)
+    player.get_node("Hair").material_override = material(hair_color)
+    player.get_node("Eyes").material_override = material(aura_color, 0.1, true)
+    player.get_node("Belt").material_override = material(aura_color, 0.1, true)
+    player.get_node("Aura").material_override = material(aura_color, 0.15, true)
+    player.get_node("SwordPivot/Blade").material_override = material(aura_color.lightened(0.35), 0.8, true)
+    message_label.text = "CHARACTER: %s" % character_names[character_index]
     update_status()
 
 func add_block_button(parent: Control) -> void:
